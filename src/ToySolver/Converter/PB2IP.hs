@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 -----------------------------------------------------------------------------
 -- |
@@ -20,12 +21,13 @@ import Data.List
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.String
 
 import qualified Data.PseudoBoolean as PBFile
 import qualified ToySolver.Data.MIP as MIP
 import qualified ToySolver.SAT.Types as SAT
 
-convert :: PBFile.Formula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
+convert :: MIP.IsVar v => PBFile.Formula -> (MIP.Problem v Rational, Map v Rational -> SAT.Model)
 convert formula = (mip, mtrans (PBFile.pbNumVars formula))
   where
     mip = MIP.Problem
@@ -67,27 +69,27 @@ convert formula = (mip, mtrans (PBFile.pbNumVars formula))
         , MIP.constrBody      = (lhs3a, op2, fromIntegral rhs - lhs3b)
         }
 
-convExpr :: PBFile.Sum -> MIP.Expr
+convExpr :: forall v. MIP.IsVar v => PBFile.Sum -> MIP.Expr v Rational
 convExpr s = concatMap g2 s
   where
-    g2 :: PBFile.WeightedTerm -> MIP.Expr
+    g2 :: PBFile.WeightedTerm -> MIP.Expr v Rational
     g2 (w, tm) = foldl' prodE [MIP.Term (fromIntegral w) []] (map g3 tm)
 
-    g3 :: PBFile.Lit -> MIP.Expr
+    g3 :: PBFile.Lit -> MIP.Expr v Rational
     g3 x
       | x > 0     = [MIP.Term 1 [convVar x]]
       | otherwise = [MIP.Term 1 [], MIP.Term (-1) [convVar (abs x)]]
 
-    prodE :: MIP.Expr -> MIP.Expr -> MIP.Expr
+    prodE :: MIP.Expr v Rational -> MIP.Expr v Rational -> MIP.Expr v Rational
     prodE e1 e2 = [prodT t1 t2 | t1 <- e1, t2 <- e2]
 
-    prodT :: MIP.Term -> MIP.Term -> MIP.Term
+    prodT :: MIP.Term v Rational -> MIP.Term v Rational -> MIP.Term v Rational
     prodT (MIP.Term c1 vs1) (MIP.Term c2 vs2) = MIP.Term (c1*c2) (vs1++vs2)
 
-convVar :: PBFile.Var -> MIP.Var
-convVar x = MIP.toVar ("x" ++ show x)
+convVar :: MIP.IsVar v => PBFile.Var -> v
+convVar x = fromString ("x" ++ show x)
 
-convertWBO :: Bool -> PBFile.SoftFormula -> (MIP.Problem, Map MIP.Var Rational -> SAT.Model)
+convertWBO :: forall v. MIP.IsVar v => Bool -> PBFile.SoftFormula -> (MIP.Problem v Rational, Map v Rational -> SAT.Model)
 convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
   where
     mip = MIP.Problem
@@ -111,7 +113,7 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
 
     obj2 = [MIP.Term (fromIntegral w) [v] | (ts, _) <- cs2, (w, v) <- ts]
 
-    topConstr :: [MIP.Constraint]
+    topConstr :: [MIP.Constraint v Rational]
     topConstr = 
      case PBFile.wboTopCost formula of
        Nothing -> []
@@ -124,14 +126,14 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
             }
           ]
 
-    cs2 :: [([(Integer, MIP.Var)], MIP.Constraint)]
+    cs2 :: [([(Integer, v)], MIP.Constraint v Rational)]
     cs2 = do
       (n, (w, (lhs,op,rhs))) <- zip [(0::Int)..] (PBFile.wboConstraints formula)
       let 
           lhs2 = convExpr lhs
           lhs3 = [t | t@(MIP.Term _ (_:_)) <- lhs2]
           rhs3 = fromIntegral rhs - sum [c | MIP.Term c [] <- lhs2]
-          v = MIP.toVar ("r" ++ show n)
+          v = fromString ("r" ++ show n)
           (ts,ind) =
             case w of
               Nothing -> ([], Nothing)
@@ -169,17 +171,17 @@ convertWBO useIndicator formula = (mip, mtrans (PBFile.wboNumVars formula))
                       }
              [ (ts, c1), ([], c2) ]
 
-relaxGE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
+relaxGE :: MIP.IsVar v => v -> (MIP.Expr v Rational, Rational) -> (MIP.Expr v Rational, Rational)
 relaxGE v (lhs, rhs) = (MIP.Term (rhs - lhs_lb) [v] : lhs, rhs)
   where
     lhs_lb = sum [min c 0 | MIP.Term c _ <- lhs]
 
-relaxLE :: MIP.Var -> (MIP.Expr, Rational) -> (MIP.Expr, Rational)
+relaxLE :: MIP.IsVar v => v -> (MIP.Expr v Rational, Rational) -> (MIP.Expr v Rational, Rational)
 relaxLE v (lhs, rhs) = (MIP.Term (rhs - lhs_ub) [v] : lhs, rhs)
   where
     lhs_ub = sum [max c 0 | MIP.Term c _ <- lhs]
 
-mtrans :: Int -> Map MIP.Var Rational -> SAT.Model
+mtrans :: MIP.IsVar v => Int -> Map v Rational -> SAT.Model
 mtrans nvar m =
   array (1, nvar)
     [ (i, val)

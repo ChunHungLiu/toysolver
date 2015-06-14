@@ -15,6 +15,7 @@ module Main where
 
 import Data.Char
 import Data.Maybe
+import Data.Interned.Text
 import qualified Data.Version as V
 import System.Environment
 import System.IO
@@ -154,6 +155,7 @@ writePBFile o pb = do
           wbo = case pb of
                   Left opb  -> PB2WBO.convert opb
                   Right wbo -> wbo
+          lp :: MIP.Problem InternedText Rational
           lp  = case pb of
                   Left opb  -> fst $ PB2IP.convert opb
                   Right wbo -> fst $ PB2IP.convertWBO (IndicatorConstraint `elem` o) wbo

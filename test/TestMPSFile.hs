@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, ScopedTypeVariables #-}
 module Main (main) where
 
 import Control.Monad
@@ -8,6 +8,7 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 import Test.Tasty.TH
+import qualified ToySolver.Data.MIP as MIP
 import ToySolver.Data.MIP.MPSFile
 
 case_testdata = checkString "testdata" testdata
@@ -53,13 +54,13 @@ checkFile fname = do
   r <- parseFile fname
   case r of
     Left err -> assertFailure (show err)
-    Right lp -> return ()
+    Right (lp :: MIP.Problem String Rational) -> return ()
 
 checkString :: String -> String -> IO ()
 checkString name str = do
   case parseString name str of
     Left err -> assertFailure (show err)
-    Right lp -> return ()
+    Right (lp :: MIP.Problem String Rational) -> return ()
 
 ------------------------------------------------------------------------
 -- Test harness

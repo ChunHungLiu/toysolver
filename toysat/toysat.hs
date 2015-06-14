@@ -32,6 +32,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Data.Ratio
+import Data.Interned.Text
 import Data.Word
 import qualified Data.Vector.Unboxed as V
 import Data.VectorSpace
@@ -844,7 +845,7 @@ mainMIP opt solver args = do
       _ -> showHelp stderr >> exitFailure
   solveMIP opt solver mip
 
-solveMIP :: Options -> SAT.Solver -> MIP.Problem -> IO ()
+solveMIP :: Options -> SAT.Solver -> MIP.Problem InternedText Rational -> IO ()
 solveMIP opt solver mip = do
   if not (Set.null nivs) then do
     putCommentLine $ "cannot handle non-integer variables: " ++ intercalate ", " (map MIP.fromVar (Set.toList nivs))

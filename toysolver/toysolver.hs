@@ -27,6 +27,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
+import Data.Interned.Text
 import System.Exit
 import System.Environment
 import System.FilePath
@@ -109,11 +110,13 @@ header = "Usage: toysolver [OPTION]... file"
 
 -- ---------------------------------------------------------------------------
 
+type MIPVar = InternedText
+
 run
   :: String
   -> [Flag]
-  -> MIP.Problem
-  -> (Map MIP.Var Rational -> IO ())
+  -> MIP.Problem MIPVar Rational
+  -> (Map MIPVar Rational -> IO ())
   -> IO ()
 run solver opt mip printModel = do
   unless (Set.null (MIP.semiContinuousVariables mip)) $ do
@@ -131,10 +134,10 @@ run solver opt mip printModel = do
     nameToVar = Map.fromList vsAssoc
     varToName = IntMap.fromList [(v,name) | (name,v) <- vsAssoc]
 
-    compileE :: MIP.Expr -> Expr Rational
+    compileE :: MIP.Expr MIPVar Rational -> Expr Rational
     compileE = foldr (+) (Const 0) . map compileT
 
-    compileT :: MIP.Term -> Expr Rational
+    compileT :: MIP.Term MIPVar Rational -> Expr Rational
     compileT (MIP.Term c vs) =
       foldr (*) (Const c) [Var (nameToVar Map.! v) | v <- vs]
 
@@ -342,7 +345,7 @@ run solver opt mip printModel = do
     showValue :: Rational -> String
     showValue = showRational printRat
 
-mipPrintModel :: Handle -> Bool -> Map MIP.Var Rational -> IO ()
+mipPrintModel :: Handle -> Bool -> Map MIPVar Rational -> IO ()
 mipPrintModel h asRat m = do
   forM_ (Map.toList m) $ \(v, val) -> do
     printf "v %s = %s\n" (MIP.fromVar v) (showRational asRat val)
@@ -446,7 +449,7 @@ main = do
         hPutStrLn stderr $ concat errs ++ usageInfo header options
 
 -- FIXME: 目的関数値を表示するように
-writeSOLFileMIP :: [Flag] -> Map MIP.Var Rational -> IO ()
+writeSOLFileMIP :: [Flag] -> Map MIPVar Rational -> IO ()
 writeSOLFileMIP opt m = do
   let m2 = Map.fromList [(MIP.fromVar v, fromRational val) | (v,val) <- Map.toList m]
   writeSOLFileRaw opt m2

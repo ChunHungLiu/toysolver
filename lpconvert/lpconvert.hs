@@ -15,6 +15,7 @@ module Main where
 
 import Data.Char
 import Data.Maybe
+import Data.Interned.Text
 import qualified Data.Version as V
 import System.Environment
 import System.IO
@@ -86,7 +87,7 @@ header = unlines
   , "Options:"
   ]
 
-readLP :: [Flag] -> String -> IO MIP.Problem
+readLP :: [Flag] -> String -> IO (MIP.Problem InternedText Rational)
 readLP o fname = do
   case map toLower (takeExtension fname) of
     ".cnf"
@@ -147,7 +148,7 @@ transformPBFile o opb | isNothing (PBFile.pbObjectiveFunction opb) = PBSetObj.se
     objType = last (ObjNone : [t | ObjType t <- o])
 transformPBFile _ opb = opb
 
-writeLP :: [Flag] -> MIP.Problem -> IO ()
+writeLP :: [Flag] -> MIP.Problem InternedText Rational -> IO ()
 writeLP o mip = do
   let mip2smtOpt =
         MIP2SMT.defaultOptions
